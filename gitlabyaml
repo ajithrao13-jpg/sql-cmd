@@ -1,0 +1,14 @@
+stages:
+  - validate
+
+validate_sql_syntax:
+  stage: validate
+  image: ubuntu:20.04
+  script:
+    - apt-get update
+    - apt-get install -y wget software-properties-common gnupg
+    - wget https://packages.microsoft.com/keys/microsoft.asc -O microsoft.asc
+    - apt-key add microsoft.asc
+    - add-apt-repository "$(wget -qO- https://packages.microsoft.com/config/ubuntu/20.04/prod.list)"
+    - apt-get update
+    - apt-get install -y sqlcmd
