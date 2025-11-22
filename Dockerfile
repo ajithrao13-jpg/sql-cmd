@@ -1,15 +1,12 @@
 FROM alpine:latest
 
-RUN apk add --no-cache tar ca-certificates \
-  && apk add --no-cache --virtual .build-deps curl
-  
-COPY sqlcmd-linux.tar.gz /tmp/sqlcmd-linux.tar.gz
+RUN apk add --no-cache tar ca-certificates bzip2
+
+COPY sqlcmd-linux-amd64.tar.bz2 /tmp/sqlcmd-linux-amd64.tar.bz2
 
 RUN mkdir -p /opt/sqlcmd \
-  && tar -xzf /tmp/sqlcmd-linux.tar.gz -C /opt/sqlcmd \
+  && tar -xjf /tmp/sqlcmd-linux-amd64.tar.bz2 -C /opt/sqlcmd \
   && ln -s /opt/sqlcmd/sqlcmd /usr/local/bin/sqlcmd
-
-# RUN apk --no-cache add libc6-compat
 
 ENV PATH="/opt/sqlcmd:${PATH}"
 
