@@ -1,0 +1,79 @@
+stages:
+  - lint
+ 
+lintcompile_noexec:
+  stage: lint
+  image: registry.gitlab.com/mandtbank/mtb/clf/clf-database/sqlcmd:1.0.0
+  variables:
+    SQLCMDLOGINTIMEOUT: "30"
+  artifacts:
+    paths:
+      - sql_syntax_report.html
+    when: always
+  script:
+    - |
+      # Fetch the previous state to be able to compare
+      git fetch origin $CI_COMMIT_BEFORE_SHA
+ 
+      # Get list of changed .sql files in the 'database_objects' directory
+      CHANGED_SQL_FILES=$(git diff --name-only $CI_COMMIT_BEFORE_SHA $CI_COMMIT_SHA -- 'database_objects/**/*.sql')
+ 
+      if [ -z "$CHANGED_SQL_FILES" ]; then
+        echo "No SQL files changed in database_objects/. Skipping syntax check."
+        exit 0
+      fi
+ 
+      echo "Found changed SQL files:"
+      echo "$CHANGED_SQL_FILES"
+ 
+      # --- Report and Status Initialization ---
+      JOB_FAILED=0
+      REPORT_FILE="sql_syntax_report.html"
+ 
+      # Create HTML report header
+      echo "<html><head><title>SQL Syntax Check Report</title><style>body{font-family:sans-serif;} table{border-collapse:collapse; width:100%;} th,td{border:1px solid #ddd; padding:8px;} th{background-color:#f2f2f2;} .status-ok{color:green; font-weight:bold;} .status-fail{color:red; font-weight:bold;} pre{white-space:pre-wrap; word-wrap:break-word; background-color:#eee; padding:10px; border-radius:5px;}</style></head><body><h2>SQL Syntax Check Report</h2><table><tr><th>File</th><th>Status</th><th>Details</th></tr>" > $REPORT_FILE
+ 
+      # --- Check each file and build report ---
+      echo "$CHANGED_SQL_FILES" | while read -r f; do
+          echo "--------------------------------------------------"
+          echo "Checking syntax for file: $f"
+          echo "--------------------------------------------------"
+ 
+          # Create a temporary script for this single file to enable NOEXEC.
+          printf "SET NOEXEC ON;\nGO\n" > "preflight_single.sql"
+          cat "$f" >> "preflight_single.sql"
+          printf "\nGO\nSET NOEXEC OFF;\nGO\n" >> "preflight_single.sql"
+ 
+          # Run sqlcmd for the individual file.
+          # We remove the '-b' flag so the script doesn't exit on the first error.
+          # We redirect stderr (2) to stdout (1) to capture any error messages.
+          ERROR_OUTPUT=$(sqlcmd \
+            -S "$DB_SERVER" \
+            -d "$DB_NAME" \
+            --authentication-method ActiveDirectoryServicePrincipal \
+            -U "$AZURE_CLIENT_ID" \
+            -P "$AZURE_CLIENT_SECRET" \
+            -i "preflight_single.sql" 2>&1)
+ 
+          # Check the exit code of the last command
+          if [ $? -ne 0 ]; then
+            echo "Syntax error found in $f"
+            JOB_FAILED=1
+            echo "<tr><td>$f</td><td class='status-fail'>Failed</td><td><pre>$ERROR_OUTPUT</pre></td></tr>" >> $REPORT_FILE
+          else
+            echo "Syntax OK for $f"
+            echo "<tr><td>$f</td><td class='status-ok'>OK</td><td></td></tr>" >> $REPORT_FILE
+          fi
+      done
+ 
+      # --- Finalize Report and Job Status ---
+      echo "</table></body></html>" >> $REPORT_FILE
+      echo "--------------------------------------------------"
+      echo "Syntax check complete. Report generated: $REPORT_FILE"
+ 
+      if [ $JOB_FAILED -ne 0 ]; then
+        echo "One or more SQL files failed the syntax check. Failing the pipeline."
+        exit 1
+      fi
+  tags:
+    - cicd-k8s
