@@ -13,10 +13,7 @@ lintcompile_noexec:
   script:
     - |
       # Fetch the previous state to be able to compare
-      git fetch origin $CI_COMMIT_BEFORE_SHA
- 
-      # Get list of changed .sql files in the 'database_objects' directory
-      CHANGED_SQL_FILES=$(git diff --name-only $CI_COMMIT_BEFORE_SHA $CI_COMMIT_SHA -- 'database_objects/**/*.sql')
+       CHANGED_SQL_FILES=$(git diff --name-only HEAD~1 HEAD -- 'database_objects/**/*.sql')
  
       if [ -z "$CHANGED_SQL_FILES" ]; then
         echo "No SQL files changed in database_objects/. Skipping syntax check."
