@@ -1,3 +1,6 @@
+if [ $? -ne 0 ] || echo "$ERROR_OUTPUT" | grep -qE '^(Msg|Error)'; then
+
+
 stages:
   - lint
  
