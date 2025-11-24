@@ -1,18 +1,18 @@
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 
-# Install prerequisites
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Single layer installation
 RUN apt-get update && \
-    apt-get install -y curl gnupg2 tar ca-certificates bzip2 && \
-    rm -rf /var/lib/apt/lists/*
-
-# Add Microsoft repository
-RUN curl https://packages.microsoft.com/keys/microsoft.asc | tee /etc/apt/trusted.gpg.d/microsoft.asc
-RUN curl https://packages.microsoft.com/config/ubuntu/20.04/prod.list | tee /etc/apt/sources.list.d/mssql-release.list
-
-# Install SQLCMD
-RUN apt-get update && \
-    ACCEPT_EULA=Y apt-get install -y mssql-tools && \
-    echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bashrc
+    apt-get install -y --no-install-recommends \
+    curl \
+    gnupg2 \
+    ca-certificates \
+    && curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > /etc/apt/trusted.gpg.d/microsoft.gpg \
+    && echo "deb [arch=amd64 signed-by=/etc/apt/trusted.gpg.d/microsoft.gpg] https://packages.microsoft.com/ubuntu/22.04/prod jammy main" > /etc/apt/sources.list.d/mssql-release.list \
+    && apt-get update \
+    && ACCEPT_EULA=Y apt-get install -y mssql-tools \
+    && rm -rf /var/lib/apt/lists/*
 
 ENV PATH="/opt/mssql-tools/bin:${PATH}"
 
